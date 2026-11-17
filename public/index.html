@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <meta name="theme-color" content="#1a1a3e">
+  <meta name="description" content="Smriti Pass — Handmade. Honest. Heritage. Direct from Master Artisans.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Smriti Pass">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,800;1,400&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="/css/styles.css">
+
+  <title>Smriti Pass — Direct from Master Artisans</title>
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="nav" id="mainNav">
+    <div class="nav__brand" onclick="navigateTo('tourist')">
+      <div class="nav__logo">
+        <span class="nav__logo-icon">🏛️</span>
+        <span class="nav__logo-text">Smriti<span class="nav__logo-accent">Pass</span></span>
+      </div>
+      <span class="nav__tagline">Direct from Master Artisans</span>
+    </div>
+    <ul class="nav__tabs" id="navTabs">
+      <li class="nav__tab nav__tab--active" data-route="tourist" onclick="navigateTo('tourist')">
+        <span class="nav__tab-icon">🗺️</span>
+        <span class="nav__tab-label">Tourist Trail</span>
+      </li>
+      <li class="nav__tab" data-route="checkout" onclick="navigateTo('checkout')">
+        <span class="nav__tab-icon">🛒</span>
+        <span class="nav__tab-label">Checkout</span>
+      </li>
+      <li class="nav__tab" data-route="artisan" onclick="navigateTo('artisan')">
+        <span class="nav__tab-icon">🎨</span>
+        <span class="nav__tab-label">Artisan Portal</span>
+      </li>
+      <li class="nav__tab" data-route="admin" onclick="navigateTo('admin')">
+        <span class="nav__tab-icon">⚙️</span>
+        <span class="nav__tab-label">Pilot Admin</span>
+      </li>
+    </ul>
+  </nav>
+
+  <!-- Main App Container -->
+  <main class="app" id="app">
+    <!-- Screens rendered here by router -->
+    <div class="app__loading" id="appLoading">
+      <div class="spinner"></div>
+      <p class="app__loading-text">Loading heritage crafts...</p>
+    </div>
+  </main>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Product Detail Modal -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal" id="productModal">
+      <button class="modal__close" id="modalClose" aria-label="Close modal">&times;</button>
+      <div class="modal__content" id="modalContent"></div>
+    </div>
+  </div>
+
+  <!-- Core Scripts -->
+  <script src="/js/qrcode.min.js"></script>
+  <script src="/js/tourist.js"></script>
+  <script src="/js/checkout.js"></script>
+  <script src="/js/artisan.js"></script>
+  <script src="/js/admin.js"></script>
+  <script src="/js/app.js"></script>
+
+  <!-- Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then((reg) => console.log('[SmritiPass PWA] SW active, scope:', reg.scope))
+          .catch((err) => console.warn('[SmritiPass PWA] SW registration failed:', err));
+      });
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "name": "smriti-pass",
+  "version": "2.0.0",
+  "description": "Smriti Pass 2.0 — Handmade. Honest. Heritage. Direct from Master Artisans.",
+  "scripts": {
+    "start": "node server/index.js",
+    "server": "node server/index.js",
+    "test": "npm --prefix server test",
+    "seed": "npm --prefix server run seed"
+  },
+  "author": "Smriti Pass Foundation",
+  "license": "UNLICENSED"
+}
