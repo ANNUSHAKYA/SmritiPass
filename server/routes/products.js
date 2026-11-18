@@ -6,12 +6,21 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 const { imageFileFilter } = require('../middleware/security');
 const { sanitizeString, sanitizeNumber } = require('../utils/cryptoAuth');
 
 // Multer storage config with file type verification
 const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, path.join(__dirname, '..', 'uploads', 'products')),
+  destination: (_req, _file, cb) => {
+    const dest = process.env.VERCEL
+      ? path.join('/tmp', 'uploads', 'products')
+      : path.join(__dirname, '..', 'uploads', 'products');
+    try {
+      if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
+    } catch (e) {}
+    cb(null, dest);
+  },
   filename: (_req, file, cb) => {
     // Generate safe alphanumeric filename
     const ext = path.extname(file.originalname).toLowerCase();

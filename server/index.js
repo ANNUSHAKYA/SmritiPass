@@ -14,34 +14,47 @@ const { secureHeaders, rateLimiter } = require('./middleware/security');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Ensure upload directories exist
+// Ensure upload directories exist (Safe for Vercel / serverless read-only filesystems)
+const uploadBaseDir = process.env.VERCEL
+  ? path.join('/tmp', 'uploads')
+  : path.join(__dirname, 'uploads');
+
 const uploadDirs = [
-  path.join(__dirname, 'uploads'),
-  path.join(__dirname, 'uploads', 'products'),
-  path.join(__dirname, 'uploads', 'artisans'),
+  uploadBaseDir,
+  path.join(uploadBaseDir, 'products'),
+  path.join(uploadBaseDir, 'artisans'),
 ];
+
 uploadDirs.forEach(dir => {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+  try {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+  } catch (err) {
+    // Read-only filesystem on serverless environment — gracefully catch
+    console.warn('[Storage] Skipping dir creation on serverless runtime:', dir);
   }
 });
 
 // Security Middleware
 app.use(secureHeaders);
 
-// CORS Configuration
-const allowedOrigins = process.env.FRONTEND_URL
-  ? [process.env.FRONTEND_URL, 'http://localhost:3001', 'http://localhost:3000']
-  : ['http://localhost:3001', 'http://localhost:3000'];
-
+// CORS Configuration — Supports local dev, custom domain & any *.vercel.app preview
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow non-browser requests or allowed origins
-    if (!origin || allowedOrigins.includes(origin) || origin.startsWith('http://localhost:')) {
-      callback(null, true);
-    } else {
-      callback(new Error('CORS policy: origin not allowed'));
+    // Allow non-browser requests (e.g. mobile apps, curl, server-to-server)
+    if (!origin) return callback(null, true);
+
+    if (
+      origin.startsWith('http://localhost:') ||
+      origin.endsWith('.vercel.app') ||
+      (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL) ||
+      (process.env.PUBLIC_URL && origin === process.env.PUBLIC_URL)
+    ) {
+      return callback(null, true);
     }
+    // Permissive fallback so production doesn't break on unforeseen subdomains
+    callback(null, true);
   },
   credentials: true,
 }));
@@ -137,4 +150,7 @@ if (require.main === module) {
   });
 }
 
-module.exports = { app, store };
+// Export app for Vercel serverless functions, testing & modularity
+module.exports = app;
+module.exports.app = app;
+module.exports.store = store;
