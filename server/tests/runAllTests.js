@@ -4,6 +4,7 @@
 // ============================================================
 const { runRevenueModelTests } = require('./revenueModel.test');
 const { runLifecycleAndSecurityTests } = require('./lifecycleAndSecurity.test');
+const { runAiTests } = require('./ai.test');
 
 console.log('========================================================');
 console.log('🏛️  SMRITI PASS 2.0 — MASTER AUTOMATED TEST SUITE');
@@ -14,9 +15,10 @@ const startTime = Date.now();
 
 const suite1 = runRevenueModelTests();
 const suite2 = runLifecycleAndSecurityTests();
+const suite3 = runAiTests();
 
-const totalPassed = suite1.passed + suite2.passed;
-const totalFailed = suite1.failed + suite2.failed;
+const totalPassed = suite1.passed + suite2.passed + suite3.passed;
+const totalFailed = suite1.failed + suite2.failed + suite3.failed;
 const durationMs = Date.now() - startTime;
 
 console.log('========================================================');

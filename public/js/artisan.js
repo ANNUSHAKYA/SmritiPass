@@ -407,8 +407,11 @@ function toggleHindiSpeechRecognition() {
 
     speechRecognizerInstance.onend = () => {
       if (micBtn) micBtn.classList.remove('mic-button--listening');
-      if (micStatus) micStatus.innerText = 'आवाज़ दर्ज हो गई! नीचे विवरण जांचें और सेव करें।';
+      if (micStatus) micStatus.innerText = '✨ Gemini AI द्वारा उत्पाद विवरण तैयार किया जा रहा है...';
       speechRecognizerInstance = null;
+      if (liveText && liveText.innerText.trim()) {
+        enhanceWithGeminiAI(liveText.innerText.trim());
+      }
     };
 
     speechRecognizerInstance.onerror = (e) => {
@@ -456,6 +459,42 @@ function parseHindiSpokenProduct(transcript) {
 
   if (descInput) {
     descInput.value = `हाथ से तैयार पारंपरिक कलाकृति: ${transcript}`;
+  }
+}
+
+/** Call Gemini AI to refine artisan voice transcript into authentic craft description */
+async function enhanceWithGeminiAI(transcript) {
+  const micStatus = document.getElementById('artisanMicStatus');
+  const catSelect = document.getElementById('voiceProdCategory');
+  const craft = catSelect ? catSelect.value : 'Marble Inlay (Parchin Kari)';
+
+  try {
+    const res = await api.post('/ai/craft-assist', { transcript, craft });
+    if (res && res.data) {
+      const p = res.data;
+      const nameInput = document.getElementById('voiceProdName');
+      const priceInput = document.getElementById('voiceProdPrice');
+      const descInput = document.getElementById('voiceProdDesc');
+
+      if (nameInput && p.productName) nameInput.value = p.productName;
+      if (priceInput && p.productPrice) priceInput.value = p.productPrice;
+      if (descInput && p.description) descInput.value = p.description;
+
+      if (micStatus) {
+        micStatus.innerText = '✓ Gemini AI ने विवरण तैयार कर दिया है! नीचे फॉर्म देखें।';
+      }
+
+      showToast('✨ Gemini AI: हस्तशिल्प विवरण सफलतापूर्वक तैयार!', 'success');
+
+      if (p.spokenHindiConfirmation) {
+        speakHindiAudio(p.spokenHindiConfirmation);
+      }
+    }
+  } catch (err) {
+    console.warn('[Artisan Gemini AI] Enhancement fallback:', err.message);
+    if (micStatus) {
+      micStatus.innerText = 'आवाज़ दर्ज हो गई! नीचे विवरण जांचें और सेव करें।';
+    }
   }
 }
 
