@@ -1,5 +1,5 @@
 // Smriti Pass 2.0 — Service Worker
-const CACHE_NAME = 'smritipass-v2.2';
+const CACHE_NAME = 'smritipass-v2.3';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -10,6 +10,7 @@ const STATIC_ASSETS = [
   '/js/artisan.js',
   '/js/admin.js',
   '/js/voicebot.js',
+  '/js/qrcode.min.js',
   '/manifest.webmanifest'
 ];
 

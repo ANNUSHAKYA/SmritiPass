@@ -297,7 +297,31 @@
     const typingId = appendTypingIndicator();
 
     try {
-      const response = await fetch('/api/ai/chat', {
+      // 1. Query the Intelligent GI Voice Search Engine
+      const response = await fetch('/api/ai/voice-search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: userText,
+          language: 'auto'
+        })
+      });
+
+      removeTypingIndicator(typingId);
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.success) {
+          const botReply = data.spokenAnswer || "Matching craft information retrieved.";
+          chatHistory.push({ sender: 'bot', text: botReply });
+          appendVoiceBotResult(botReply, data.data || [], data.detectedLanguage || 'hi-IN');
+          speakText(botReply, data.detectedLanguage || 'hi-IN');
+          return;
+        }
+      }
+
+      // 2. Fallback to conversational chat if query is outside GI database
+      const chatRes = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -306,27 +330,77 @@
         })
       });
 
-      removeTypingIndicator(typingId);
+      if (!chatRes.ok) throw new Error(`Server returned ${chatRes.status}`);
 
-      if (!response.ok) {
-        throw new Error(`Server returned ${response.status}`);
-      }
-
-      const data = await response.json();
-      const botReply = data.reply || "I am glad to help you explore Agra's rich master crafts!";
+      const chatData = await chatRes.json();
+      const botReply = chatData.reply || "I am glad to help you explore India's master heritage crafts!";
 
       chatHistory.push({ sender: 'bot', text: botReply });
-      appendMessage(botReply, 'bot', data.detectedLang);
+      appendMessage(botReply, 'bot', chatData.detectedLang || 'hi-IN');
+      speakText(botReply, chatData.detectedLang || 'hi-IN');
 
-      // Speak aloud through Web Speech API
-      speakText(botReply, data.detectedLang || 'hi-IN');
     } catch (err) {
       removeTypingIndicator(typingId);
       console.error('[Smriti Voice Bot Error]', err);
-      const fallbackMsg = "नमस्ते! स्मृति पास पर आपका स्वागत है। 70:30 मॉडल के तहत कारीगरों को 70% भुगतान सीधे मिलता है। (Welcome! Under our 70:30 model, master artisans receive 70% direct payment.)";
+      const fallbackMsg = "नमस्ते! स्मृति पास पर आपका स्वागत है। आप कश्मीर और उत्तर प्रदेश के 102 पंजीकृत हस्तशिल्पों के बारे में पूछ सकते हैं।";
       appendMessage(fallbackMsg, 'bot', 'hi-IN');
       speakText(fallbackMsg, 'hi-IN');
     }
+  }
+
+  function appendVoiceBotResult(spokenText, items, lang = 'hi-IN') {
+    const container = document.getElementById('voiceBotMessages');
+    if (!container) return;
+
+    const msg = document.createElement('div');
+    msg.className = 'voicebot-msg voicebot-msg--bot';
+
+    let cardsHtml = '';
+    if (items && items.length > 0) {
+      cardsHtml = `
+        <div class="voicebot-result-cards">
+          ${items.slice(0, 4).map(item => `
+            <div class="voicebot-mini-card">
+              <div class="voicebot-mini-card__top">
+                <span class="mini-badge">✓ GI</span>
+                <span class="mini-cat">${item.category}</span>
+                <span class="mini-state">${item.state}</span>
+              </div>
+              <strong class="mini-title">${item.name}</strong>
+              ${item.hindiName ? `<p class="mini-hindi">${item.hindiName}</p>` : ''}
+              <div class="mini-meta">Reg: <strong>${item.registrationDate}</strong></div>
+              ${item.linkedMarketplaceProduct ? `
+                <div class="mini-linked">
+                  <span>✨ Authentic Artisan Listing Available</span>
+                </div>
+              ` : ''}
+              <button class="mini-listen-btn" onclick="window.speakAgain('${encodeURIComponent(`This is ${item.name}, a registered ${item.category} from ${item.state}. Registration date is ${item.registrationDate}.`)}', '${lang}')">
+                🔊 Listen
+              </button>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    msg.innerHTML = `
+      <div class="voicebot-msg__avatar">🏛️</div>
+      <div class="voicebot-msg__bubble">
+        <p>${escapeHtml(spokenText)}</p>
+        ${cardsHtml}
+        <div class="voicebot-msg__meta">
+          <button class="voicebot-listen-btn" onclick="window.speakAgain('${encodeURIComponent(spokenText)}', '${lang}')">
+            🔊 Replay
+          </button>
+          <button class="voicebot-listen-btn" onclick="window.stopSpeakingUtterance()">
+            ⏹ Stop
+          </button>
+        </div>
+      </div>
+    `;
+
+    container.appendChild(msg);
+    container.scrollTop = container.scrollHeight;
   }
 
   function appendMessage(text, sender, lang = 'en-IN') {
@@ -344,6 +418,9 @@
           <div class="voicebot-msg__meta">
             <button class="voicebot-listen-btn" onclick="window.speakAgain('${encodeURIComponent(text)}', '${lang}')">
               🔊 Listen
+            </button>
+            <button class="voicebot-listen-btn" onclick="window.stopSpeakingUtterance()">
+              ⏹ Stop
             </button>
           </div>
         </div>
@@ -406,6 +483,10 @@
     } catch (e) {
       console.warn('Speech playback failed:', e);
     }
+  };
+
+  window.stopSpeakingUtterance = function () {
+    stopSpeaking();
   };
 
   window.toggleSmritiVoiceBot = toggleVoiceBotModal;

@@ -89,6 +89,7 @@ app.use('/api/products', require('./routes/products')(store));
 app.use('/api/orders', require('./routes/orders')(store));
 app.use('/api/qr', require('./routes/qr')(store));
 app.use('/api/ai', require('./routes/ai')(store));
+app.use('/api/gi', require('./routes/gi')(store));
 
 // Health / Status endpoint with production telemetry
 const serverStartTime = Date.now();

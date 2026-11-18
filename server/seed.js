@@ -297,6 +297,8 @@ const orders = [
 ];
 
 // --------------- In-Memory Store Class ---------------
+const { giRegistryData } = require('./data/giRegistryData');
+
 class InMemoryStore {
   constructor() {
     this.artisans = new Map();
@@ -304,18 +306,30 @@ class InMemoryStore {
     this.orders = new Map();
     this.hotels = new Map();
     this.guides = new Map();
+    this.giProducts = new Map();
     this.qrScans = {
       total: 735,
       byHotel: new Map(),
       byDate: new Map(),
     };
-    this._counters = { artisan: 10, product: 10, order: 10, hotel: 10, guide: 10 };
+    this._counters = { artisan: 10, product: 10, order: 10, hotel: 10, guide: 10, gi: 105 };
 
     artisans.forEach(a => this.artisans.set(a._id, { ...a }));
     products.forEach(p => this.products.set(p._id, { ...p }));
     orders.forEach(o => this.orders.set(o._id, { ...o }));
     hotels.forEach(h => this.hotels.set(h._id, { ...h }));
     guides.forEach(g => this.guides.set(g._id, { ...g }));
+
+    // Import the 102 GI Registered Crafts & Products (Idempotent seed)
+    giRegistryData.forEach((item, index) => {
+      const id = `gi-${String(index + 1).padStart(3, '0')}`;
+      this.giProducts.set(id, {
+        _id: id,
+        ...item,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    });
   }
 
   nextId(type) {
@@ -418,6 +432,135 @@ class InMemoryStore {
     const guide = { _id: id, referralsCount: 0, status: 'active', ...data, createdAt: new Date() };
     this.guides.set(id, guide);
     return guide;
+  }
+
+  // ─── GI Products Registry (gi_products) ───────────────────────
+  getAllGiProducts() {
+    return Array.from(this.giProducts.values());
+  }
+
+  getGiProduct(id) {
+    if (!id) return null;
+    return this.giProducts.get(id) ||
+      Array.from(this.giProducts.values()).find(g => g.name.toLowerCase() === id.toLowerCase()) || null;
+  }
+
+  createGiProduct(data) {
+    const id = this.nextId('gi');
+    const record = {
+      _id: id,
+      status: 'Registered',
+      source: 'Uploaded GI registration screenshots',
+      active: true,
+      ...data,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.giProducts.set(id, record);
+    return record;
+  }
+
+  updateGiProduct(id, data) {
+    const existing = this.getGiProduct(id);
+    if (!existing) return null;
+    const updated = {
+      ...existing,
+      ...data,
+      _id: existing._id,
+      updatedAt: new Date(),
+    };
+    this.giProducts.set(existing._id, updated);
+    return updated;
+  }
+
+  searchGiProducts({ query = '', state = '', category = '', status = '', limit = 12 } = {}) {
+    let list = Array.from(this.giProducts.values());
+
+    if (state) {
+      const sLower = state.toLowerCase().trim();
+      list = list.filter(r => r.state && r.state.toLowerCase().includes(sLower));
+    }
+
+    if (category) {
+      const cLower = category.toLowerCase().trim();
+      list = list.filter(r => r.category && r.category.toLowerCase().includes(cLower));
+    }
+
+    if (status) {
+      const stLower = status.toLowerCase().trim();
+      list = list.filter(r => r.status && r.status.toLowerCase() === stLower);
+    }
+
+    if (!query || !query.trim()) {
+      return list.slice(0, limit);
+    }
+
+    const q = query.toLowerCase().trim();
+    const qEscaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    // Scoring & Ranking algorithm
+    const scored = [];
+    for (const item of list) {
+      const name = (item.name || '').toLowerCase();
+      const hindi = (item.hindiName || '').toLowerCase();
+      const region = (item.region || '').toLowerCase();
+      const cat = (item.category || '').toLowerCase();
+      const st = (item.state || '').toLowerCase();
+
+      let score = 0;
+
+      if (name === q || hindi === q) {
+        score = 100; // Exact match
+      } else if (name.startsWith(q) || hindi.startsWith(q)) {
+        score = 85;  // Prefix match
+      } else if (new RegExp('(^|\\b)' + qEscaped + '(\\b|$)', 'i').test(name) || new RegExp('(^|\\b)' + qEscaped + '(\\b|$)', 'i').test(region)) {
+        score = 75;  // Whole-word match in name or region (e.g. "Agra")
+      } else if (region.startsWith(q)) {
+        score = 65;  // Region prefix
+      } else if (name.includes(q) || hindi.includes(q)) {
+        score = 25;  // Weak substring match
+      } else if (region.includes(q)) {
+        score = 20;
+      } else if (cat.includes(q) || st.includes(q)) {
+        score = 15;
+      } else {
+        // Multi-word partial overlap
+        const words = q.split(/\s+/).filter(w => w.length > 2);
+        let wordMatches = 0;
+        for (const w of words) {
+          if (name.includes(w) || hindi.includes(w) || region.includes(w)) {
+            wordMatches++;
+          }
+        }
+        if (wordMatches > 0) {
+          score = 20 + (wordMatches * 10);
+        }
+      }
+
+      if (score > 0) {
+        scored.push({ item, score });
+      }
+    }
+
+    scored.sort((a, b) => b.score - a.score);
+    return scored.slice(0, limit).map(s => s.item);
+  }
+
+  getGiStats() {
+    const list = this.getAllGiProducts();
+    const byState = { 'Jammu & Kashmir': 0, 'Uttar Pradesh': 0 };
+    const byCategory = {};
+
+    list.forEach(item => {
+      if (byState[item.state] !== undefined) byState[item.state]++;
+      byCategory[item.category] = (byCategory[item.category] || 0) + 1;
+    });
+
+    return {
+      total: list.length,
+      byState,
+      byCategory,
+    };
   }
 
   // QR Scan Recording

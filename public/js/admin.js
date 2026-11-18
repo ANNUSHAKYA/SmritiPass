@@ -64,6 +64,9 @@ function renderAdminScreen() {
           <button class="admin-tab admin-tab--active" id="tabOrdersBtn" onclick="switchAdminSubTab('orders')">
             📦 Orders & Payouts (<span id="adminOrdersCount">1</span>)
           </button>
+          <button class="admin-tab" id="tabGiregistryBtn" onclick="switchAdminSubTab('giregistry')">
+            🏛️ GI Registry (102)
+          </button>
           <button class="admin-tab" id="tabHotelsBtn" onclick="switchAdminSubTab('hotels')">
             🏨 Boutique Hotels (5)
           </button>
@@ -84,6 +87,38 @@ function renderAdminScreen() {
             </div>
             <div class="orders-table-wrapper" id="adminOrdersTableWrapper">
               <p class="text-sm text-slate-500">Loading orders...</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB: Official GI Registry Management -->
+        <div class="admin-tab-content" id="adminTabGiregistry" style="display: none;">
+          <div class="card">
+            <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
+              <div>
+                <h3 class="font-serif font-bold text-lg text-navy">Official Geographical Indication (GI) Database</h3>
+                <p class="text-xs text-slate-500">102 Registered Crafts & Products (24 Jammu & Kashmir, 78 Uttar Pradesh). Separate from shopping catalogue.</p>
+              </div>
+              <div class="flex gap-2 items-center flex-wrap">
+                <input type="text" id="adminGiSearch" class="form-input form-input--sm" placeholder="Filter crafts..." oninput="filterAdminGiRecords()">
+                <select id="adminGiStateFilter" class="form-input form-input--sm" onchange="filterAdminGiRecords()">
+                  <option value="">All States</option>
+                  <option value="Jammu & Kashmir">Jammu & Kashmir (24)</option>
+                  <option value="Uttar Pradesh">Uttar Pradesh (78)</option>
+                </select>
+                <select id="adminGiCatFilter" class="form-input form-input--sm" onchange="filterAdminGiRecords()">
+                  <option value="">All Categories</option>
+                  <option value="Handicraft">Handicraft</option>
+                  <option value="Agricultural">Agricultural</option>
+                  <option value="Food Stuff">Food Stuff</option>
+                  <option value="Manufactured">Manufactured</option>
+                  <option value="Natural">Natural</option>
+                </select>
+                <button class="btn btn--outline btn--sm" onclick="loadAdminGiRecords()">🔄 Reload</button>
+              </div>
+            </div>
+            <div class="orders-table-wrapper" id="adminGiTableWrapper">
+              <p class="text-sm text-slate-500">Loading GI database...</p>
             </div>
           </div>
         </div>
@@ -317,8 +352,10 @@ function renderAdminGuides(guides) {
   `).join('');
 }
 
+let adminGiData = [];
+
 function switchAdminSubTab(tabName) {
-  const tabs = ['orders', 'hotels', 'guides', 'qrmagnet'];
+  const tabs = ['orders', 'giregistry', 'hotels', 'guides', 'qrmagnet'];
   tabs.forEach(t => {
     const el = document.getElementById(`adminTab${t.charAt(0).toUpperCase() + t.slice(1)}`);
     const btn = document.getElementById(`tab${t.charAt(0).toUpperCase() + t.slice(1)}Btn`);
@@ -328,6 +365,165 @@ function switchAdminSubTab(tabName) {
       else btn.classList.remove('admin-tab--active');
     }
   });
+
+  if (tabName === 'giregistry' && adminGiData.length === 0) {
+    loadAdminGiRecords();
+  }
+}
+
+async function loadAdminGiRecords() {
+  const wrapper = document.getElementById('adminGiTableWrapper');
+  if (!wrapper) return;
+  wrapper.innerHTML = '<p class="text-sm text-slate-500">Loading GI database...</p>';
+
+  try {
+    const res = await api.get('/gi/products?limit=150');
+    if (res && res.data) {
+      adminGiData = res.data;
+      renderAdminGiTable(adminGiData);
+    }
+  } catch (err) {
+    wrapper.innerHTML = `<p class="text-sm text-rose-600">Failed to load GI records: ${err.message}</p>`;
+  }
+}
+
+function renderAdminGiTable(records) {
+  const wrapper = document.getElementById('adminGiTableWrapper');
+  if (!wrapper) return;
+
+  if (!records || records.length === 0) {
+    wrapper.innerHTML = '<p class="text-sm text-slate-500 p-4">No matching GI records found.</p>';
+    return;
+  }
+
+  wrapper.innerHTML = `
+    <table class="orders-table">
+      <thead>
+        <tr>
+          <th>Craft Name</th>
+          <th>State</th>
+          <th>Category</th>
+          <th>Registration Date</th>
+          <th>Region / Cluster</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${records.map(r => `
+          <tr>
+            <td>
+              <strong>${r.name}</strong>
+              ${r.hindiName ? `<div class="text-xs text-amber-700">${r.hindiName}</div>` : ''}
+            </td>
+            <td><span class="text-xs font-semibold text-slate-700">${r.state}</span></td>
+            <td><span class="badge-pill">${r.category}</span></td>
+            <td><code class="text-xs font-mono">${r.registrationDate}</code></td>
+            <td class="text-xs text-slate-600">${r.region || '—'}</td>
+            <td><span class="badge-pill badge-pill--demo">${r.status}</span></td>
+            <td>
+              <button class="btn btn--outline btn--xs" onclick="openEditGiModal('${r._id || r.name}')">Edit ✏️</button>
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+function filterAdminGiRecords() {
+  const search = (document.getElementById('adminGiSearch')?.value || '').toLowerCase().trim();
+  const state = document.getElementById('adminGiStateFilter')?.value || '';
+  const cat = document.getElementById('adminGiCatFilter')?.value || '';
+
+  let filtered = adminGiData;
+  if (state) filtered = filtered.filter(r => r.state === state);
+  if (cat) filtered = filtered.filter(r => r.category === cat);
+  if (search) {
+    filtered = filtered.filter(r =>
+      r.name.toLowerCase().includes(search) ||
+      (r.hindiName && r.hindiName.toLowerCase().includes(search)) ||
+      (r.region && r.region.toLowerCase().includes(search))
+    );
+  }
+
+  renderAdminGiTable(filtered);
+}
+
+function openEditGiModal(recordId) {
+  const item = adminGiData.find(r => r._id === recordId || r.name === recordId);
+  if (!item) return;
+
+  const modalHtml = `
+    <div class="admin-modal-form">
+      <h3 class="font-serif font-bold text-lg text-navy mb-1">Update GI Record: ${item.name}</h3>
+      <p class="text-xs text-slate-500 mb-4">Admin facility to update official registry details and metadata.</p>
+      
+      <form onsubmit="submitEditGiRecord(event, '${item._id || item.name}')" class="space-y-3">
+        <div class="form-group">
+          <label class="text-xs font-bold text-navy">Craft Name</label>
+          <input type="text" id="editGiName" class="form-input" value="${item.name}" required>
+        </div>
+        <div class="form-group">
+          <label class="text-xs font-bold text-navy">Hindi Name</label>
+          <input type="text" id="editGiHindi" class="form-input" value="${item.hindiName || ''}">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="text-xs font-bold text-navy">Category</label>
+            <select id="editGiCat" class="form-input">
+              <option value="Handicraft" ${item.category === 'Handicraft' ? 'selected' : ''}>Handicraft</option>
+              <option value="Agricultural" ${item.category === 'Agricultural' ? 'selected' : ''}>Agricultural</option>
+              <option value="Food Stuff" ${item.category === 'Food Stuff' ? 'selected' : ''}>Food Stuff</option>
+              <option value="Manufactured" ${item.category === 'Manufactured' ? 'selected' : ''}>Manufactured</option>
+              <option value="Natural" ${item.category === 'Natural' ? 'selected' : ''}>Natural</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="text-xs font-bold text-navy">Registration Date</label>
+            <input type="text" id="editGiDate" class="form-input" value="${item.registrationDate}" placeholder="DD.MM.YYYY" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="text-xs font-bold text-navy">Origin Region / Cluster</label>
+          <input type="text" id="editGiRegion" class="form-input" value="${item.region || ''}">
+        </div>
+        <div class="modal-cta-row mt-4">
+          <button type="submit" class="btn btn--gold btn--block font-bold">Save Changes</button>
+          <button type="button" class="btn btn--outline btn--block" onclick="closeModal()">Cancel</button>
+        </div>
+      </form>
+    </div>
+  `;
+
+  openModal(modalHtml);
+}
+
+async function submitEditGiRecord(event, recordId) {
+  event.preventDefault();
+  const name = document.getElementById('editGiName')?.value?.trim();
+  const hindiName = document.getElementById('editGiHindi')?.value?.trim();
+  const category = document.getElementById('editGiCat')?.value;
+  const registrationDate = document.getElementById('editGiDate')?.value?.trim();
+  const region = document.getElementById('editGiRegion')?.value?.trim();
+
+  try {
+    const res = await api.put(`/gi/products/${recordId}`, {
+      name,
+      hindiName,
+      category,
+      registrationDate,
+      region
+    });
+
+    if (res && res.success) {
+      showToast(`GI Record "${name}" updated successfully`, 'success');
+      closeModal();
+      loadAdminGiRecords();
+    }
+  } catch (err) {
+    showToast(`Failed to update GI record: ${err.message}`, 'error');
+  }
 }
 
 async function adminMarkPayoutCredited(orderId) {
